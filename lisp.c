@@ -180,10 +180,6 @@ value_t symbol(char *str)
     return tagptr(*pnode, TAG_SYM);
 }
 
-value_t set_symbol(char* name, value_t v) {
-  return set(symbol(name), v);
-}
-
 // initialization -------------------------------------------------------------
 
 static unsigned char *fromspace;
@@ -1036,7 +1032,7 @@ int main(int argc, char* argv[])
       if (feof(stdin)) return 0;
 
       print(stdout, v=toplevel_eval(v));
-      set_symbol("that", v);
+      set(symbol("that"), v);
       printf("\n\n");
     }
     return 0;
