@@ -141,7 +141,7 @@ SAFECAST_OP(number,number_t, numval)
 
 // symbol table ---------------------------------------------------------------
 
-static symbol_t *symtab = NULL;
+symbol_t *symtab = NULL;
 
 static symbol_t *mk_symbol(char *str)
 {
@@ -170,7 +170,7 @@ static symbol_t **symtab_lookup(symbol_t **ptree, char *str)
     return ptree;
 }
 
-value_t symbol(char *str)
+static value_t symbol(char *str)
 {
     symbol_t **pnode;
 

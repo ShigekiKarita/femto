@@ -28,6 +28,17 @@ struct symbol_t {
   char[1] name;      // for an outer string pointer.
 }
 
+enum Tag {
+  num = 0x0,
+  builtin = 0x1,
+  sym = 0x2,
+  cons = 0x3,
+}
+
+value_t tagptr(symbol_t* p, Tag t) {
+  return (cast(value_t) p) | t;
+}
+
 T* ptr(T)(value_t x) {
   return cast(T*) (x & ~(cast(value_t) 0x3));
 }
@@ -50,7 +61,33 @@ extern (C) extern __gshared jmp_buf toplevel;
 
 // symbol table ---------------------------------------------------------------
 
-extern (C) value_t symbol(const(char)* str);
+// TODO(karita): Remove extern when gc() is implemented.
+extern (C) extern __gshared symbol_t* symtab;
+
+symbol_t* mk_symbol(const(char)* str) {
+  // TODO(karita): Use str.length instead of strlen.
+  size_t len = strlen(str);
+  auto sym = cast(symbol_t*) malloc(symbol_t.sizeof + len);
+  // strcpy(sym.name.ptr, str);
+  memcpy(sym.name.ptr, str, len + 1);
+  return sym;
+}
+
+symbol_t** symtab_lookup(symbol_t** ptree, const(char)* str) {
+  while (*ptree !is null) {
+    int x = strcmp(str, (*ptree).name.ptr);
+    if (x == 0) return ptree;
+    if (x < 0) ptree = &(*ptree).left;
+    else ptree = &(*ptree).right;
+  }
+  return ptree;
+}
+
+value_t symbol(const(char)* str) {
+  symbol_t** pnode = symtab_lookup(&symtab, str);
+  if (*pnode is null) *pnode = mk_symbol(str);
+  return tagptr(*pnode, Tag.sym);
+}
 
 // initialization -------------------------------------------------------------
 
