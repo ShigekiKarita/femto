@@ -11,8 +11,5 @@ lisp.o: lisp.c
 lisp_d: lisp_d.d lisp.o
 	$(DC) --d-debug -betterC lisp_d.d lisp.o
 
-lisp_c: lisp.o lisp_c.o
-	$(CC) $(DEBUGFLAGS) lisp.o lisp_c.c -o $@
-
-lisp_c_main: lisp.c
+lisp_c: lisp.c
 	$(CC) $(DEBUGFLAGS) -DUSE_C_MAIN $< -o $@

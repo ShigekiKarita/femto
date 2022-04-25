@@ -21,23 +21,41 @@ enum PROCESS_STACK_SIZE = 2 * 1024 * 1024;
 
 extern (C) extern __gshared uint SP;
 
+// error utilities ------------------------------------------------------------
+
 extern (C) extern __gshared jmp_buf toplevel;
+
+// safe cast operators --------------------------------------------------------
+
+// symbol table ---------------------------------------------------------------
+
+// initialization -------------------------------------------------------------
+
+extern (C) void lisp_init();
+
+// conses ---------------------------------------------------------------------
+
+// collector ------------------------------------------------------------------
+
+// read -----------------------------------------------------------------------
+
+extern (C) value_t read_sexpr(FILE* f);
+
+// print ----------------------------------------------------------------------
+
+extern (C) void print(FILE* f, value_t v);
+
+// eval -----------------------------------------------------------------------
+
+// repl -----------------------------------------------------------------------
 
 extern (C) extern __gshared char* infile;
 
-extern (C) void lisp_init();
+extern (C) value_t toplevel_eval(value_t expr);
 
 extern (C) value_t load_file(const(char)* fname);
 
 extern (C) value_t set_symbol(const(char)* sym_name, value_t v);
-
-extern (C) value_t read_sexpr(FILE* f);
-
-extern (C) void print(FILE* f, value_t v);
-
-extern (C) value_t toplevel_eval(value_t expr);
-
-// extern (C) bool eval_line();
 
 extern (C) int main(int argc, char** argv) {
   value_t v;

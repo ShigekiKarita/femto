@@ -1010,18 +1010,6 @@ value_t load_file(char *fname)
     return v;
 }
 
-_Bool eval_line(void) {
-  printf("> ");
-  value_t v = read_sexpr(stdin);
-  if (feof(stdin)) return 0;
-
-  print(stdout, v=toplevel_eval(v));
-  // set(symbol("that"), v);
-  set_symbol("that", v);
-  printf("\n\n");
-  return 1;
-}
-
 #ifdef USE_C_MAIN
 int main(int argc, char* argv[])
 {
@@ -1042,7 +1030,15 @@ int main(int argc, char* argv[])
     if (argc > 1) { load_file(argv[1]); return 0; }
     printf("Welcome to femtoLisp ----------------------------------------------------------\n");
  repl:
-    while (eval_line()) {}
+    while (1) {
+      printf("> ");
+      v = read_sexpr(stdin);
+      if (feof(stdin)) return 0;
+
+      print(stdout, v=toplevel_eval(v));
+      set_symbol("that", v);
+      printf("\n\n");
+    }
     return 0;
 }
 #endif
