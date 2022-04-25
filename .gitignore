@@ -1,0 +1,9 @@
+*
+
+!*/
+!*.lsp
+!*.d
+!*.c
+!*.md
+!Makefile
+!.gitignore
