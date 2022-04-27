@@ -43,15 +43,42 @@ T* ptr(T)(value_t x) {
   return cast(T*) (x & ~(cast(value_t) 0x3));
 }
 
+value_t builtin(int n) {
+  return tagptr(cast(symbol_t*) (n << 2), Tag.builtin);
+}
+
 value_t set(value_t s, value_t v) {
   return ptr!symbol_t(s).binding = v;
 }
+
+value_t setc(value_t s, value_t v) {
+  return ptr!symbol_t(s).constant = v;
+}
+
+
+enum {
+    // special forms
+    F_QUOTE=0, F_COND, F_IF, F_AND, F_OR, F_WHILE, F_LAMBDA, F_MACRO, F_LABEL,
+    F_PROGN,
+    // functions
+    F_EQ, F_ATOM, F_CONS, F_CAR, F_CDR, F_READ, F_EVAL, F_PRINT, F_SET, F_NOT,
+    F_LOAD, F_SYMBOLP, F_NUMBERP, F_ADD, F_SUB, F_MUL, F_DIV, F_LT, F_PROG1,
+    F_APPLY, F_RPLACA, F_RPLACD, F_BOUNDP, N_BUILTINS
+}
+
+static string[] builtin_names =
+    [ "quote", "cond", "if", "and", "or", "while", "lambda", "macro", "label",
+      "progn", "eq", "atom", "cons", "car", "cdr", "read", "eval", "print",
+      "set", "not", "load", "symbolp", "numberp", "+", "-", "*", "/", "<",
+      "prog1", "apply", "rplaca", "rplacd", "boundp" ];
 
 extern (C) extern __gshared char* stack_bottom;
 
 enum PROCESS_STACK_SIZE = 2 * 1024 * 1024;
 
 extern (C) extern __gshared uint SP;
+
+extern (C) extern __gshared value_t NIL, T, LAMBDA, MACRO, LABEL, QUOTE;
 
 // error utilities ------------------------------------------------------------
 
@@ -91,7 +118,29 @@ value_t symbol(const(char)* str) {
 
 // initialization -------------------------------------------------------------
 
-extern (C) void lisp_init();
+extern (C) extern __gshared ubyte* fromspace;
+extern (C) extern __gshared ubyte* tospace;
+extern (C) extern __gshared ubyte* curheap;
+extern (C) extern __gshared ubyte* lim;
+extern (C) extern __gshared uint heapsize;
+
+void lisp_init() {
+  fromspace = cast(ubyte*) malloc(heapsize);
+  tospace   = cast(ubyte*) malloc(heapsize);
+  curheap = fromspace;
+  lim = curheap+heapsize-cons_t.sizeof;
+
+  NIL = symbol("nil"); setc(NIL, NIL);
+  T   = symbol("t");   setc(T,   T);
+  LAMBDA = symbol("lambda");
+  MACRO = symbol("macro");
+  LABEL = symbol("label");
+  QUOTE = symbol("quote");
+  foreach (i; 0 .. N_BUILTINS) {
+    setc(symbol(builtin_names[i].ptr), builtin(i));
+  }
+  setc(symbol("princ"), builtin(F_PRINT));
+}
 
 // conses ---------------------------------------------------------------------
 

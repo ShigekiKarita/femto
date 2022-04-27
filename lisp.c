@@ -99,7 +99,8 @@ u_int32_t SP = 0;
 #define POP()   (Stack[--SP])
 #define POPN(n) (SP-=(n))
 
-static value_t NIL, T, LAMBDA, MACRO, LABEL, QUOTE;
+// static
+value_t NIL, T, LAMBDA, MACRO, LABEL, QUOTE;
 
 value_t read_sexpr(FILE *f);
 void print(FILE *f, value_t v);
@@ -182,11 +183,16 @@ static value_t symbol(char *str)
 
 // initialization -------------------------------------------------------------
 
-static unsigned char *fromspace;
-static unsigned char *tospace;
-static unsigned char *curheap;
-static unsigned char *lim;
-static u_int32_t heapsize = 64*1024;//bytes
+// static
+unsigned char *fromspace;
+// static
+unsigned char *tospace;
+// static
+unsigned char *curheap;
+// static
+unsigned char *lim;
+// static
+u_int32_t heapsize = 64*1024;//bytes
 
 void lisp_init(void)
 {
