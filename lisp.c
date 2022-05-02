@@ -106,7 +106,7 @@ value_t NIL, T, LAMBDA, MACRO, LABEL, QUOTE;
 value_t read_sexpr(FILE *f);
 static void print(FILE *f, value_t v);
 value_t eval_sexpr(value_t e, value_t *penv);
-value_t load_file(char *fname);
+static value_t load_file(char *fname);
 
 // error utilities ------------------------------------------------------------
 
@@ -987,10 +987,9 @@ value_t eval_sexpr(value_t e, value_t *penv)
 
 // repl -----------------------------------------------------------------------
 
-// static
-char *infile = NULL;
+static char *infile = NULL;
 
-value_t toplevel_eval(value_t expr)
+static value_t toplevel_eval(value_t expr)
 {
     value_t v;
     u_int32_t saveSP = SP;
@@ -1000,7 +999,7 @@ value_t toplevel_eval(value_t expr)
     return v;
 }
 
-value_t load_file(char *fname)
+static value_t load_file(char *fname)
 {
     value_t e, v=NIL;
     char *lastfile = infile;

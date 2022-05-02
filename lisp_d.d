@@ -364,13 +364,50 @@ void print(FILE* f, value_t v) {
 
 // eval -----------------------------------------------------------------------
 
+value_t eval(value_t e, value_t* env) {
+  final switch (tag(e)) {
+    case Tag.num:
+    case Tag.builtin:
+      return e;
+    case Tag.sym:
+    case Tag.cons:
+      return eval_sexpr(e, env);
+  }
+}
+
+extern (C) value_t eval_sexpr(value_t e, value_t *penv);
+
 // repl -----------------------------------------------------------------------
 
-extern (C) extern __gshared char* infile;
+const(char)* infile;
 
-extern (C) value_t toplevel_eval(value_t expr);
+value_t toplevel_eval(value_t expr) {
+  value_t v;
+  uint saveSP = SP;
+  PUSH(NIL);
+  v = eval(expr, &Stack[SP-1]);
+  SP = saveSP;
+  return v;
+}
 
-extern (C) value_t load_file(const(char)* fname);
+value_t load_file(const(char)* fname) {
+  const(char)* lastfile = infile;
+
+  FILE *f = fopen(fname, "r");
+  infile = fname;
+  if (f is null) lerror("file not found\n");
+
+  value_t v = NIL;
+  while (1) {
+    value_t e = read_sexpr(f);
+    if (feof(f)) break;
+    v = toplevel_eval(e);
+  }
+
+  infile = lastfile;
+  fclose(f);
+  return v;
+}
 
 extern (C) int main(int argc, char** argv) {
   value_t v;
