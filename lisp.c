@@ -92,7 +92,8 @@ static char *builtin_names[] =
 char *stack_bottom;
 #define PROCESS_STACK_SIZE (2*1024*1024)
 #define N_STACK 49152
-static value_t Stack[N_STACK];
+// static
+value_t Stack[N_STACK];
 // static
 u_int32_t SP = 0;
 #define PUSH(v) (Stack[SP++] = (v))
@@ -109,9 +110,9 @@ value_t load_file(char *fname);
 
 // error utilities ------------------------------------------------------------
 
-jmp_buf toplevel;
+static jmp_buf toplevel;
 
-void lerror(char *format, ...)
+static void lerror(char *format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -120,7 +121,7 @@ void lerror(char *format, ...)
     longjmp(toplevel, 1);
 }
 
-void type_error(char *fname, char *expected, value_t got)
+static void type_error(char *fname, char *expected, value_t got)
 {
     fprintf(stderr, "%s: error: expected %s, got ", fname, expected);
     print(stderr, got); lerror("\n");
@@ -194,7 +195,7 @@ unsigned char *lim;
 // static
 u_int32_t heapsize = 64*1024;//bytes
 
-void lisp_init(void)
+static void lisp_init(void)
 {
     int i;
 
@@ -216,7 +217,7 @@ void lisp_init(void)
 
 // conses ---------------------------------------------------------------------
 
-void gc(void);
+static void gc(void);
 
 static value_t mk_cons(void)
 {
@@ -236,7 +237,7 @@ static value_t cons_(value_t *pcar, value_t *pcdr)
     return c;
 }
 
-value_t *cons(value_t *pcar, value_t *pcdr)
+static value_t *cons(value_t *pcar, value_t *pcdr)
 {
     value_t c = mk_cons();
     car_(c) = *pcar; cdr_(c) = *pcdr;
@@ -271,7 +272,7 @@ static void trace_globals(symbol_t *root)
     }
 }
 
-void gc(void)
+static void gc(void)
 {
     static int grew = 0;
     unsigned char *temp;
@@ -318,8 +319,10 @@ static int symchar(char c)
     return (!isspace(c) && !strchr(special, c));
 }
 
-static u_int32_t toktype = TOK_NONE;
-static value_t tokval;
+// static
+u_int32_t toktype = TOK_NONE;
+// static
+value_t tokval;
 static char buf[256];
 
 static char nextchar(FILE *f)
@@ -390,7 +393,8 @@ static int read_token(FILE *f, char c)
     return (dot && (totread==2));
 }
 
-static u_int32_t peek(FILE *f)
+// static
+u_int32_t peek(FILE *f)
 {
     char c, *end;
     number_t x;
@@ -435,7 +439,8 @@ static u_int32_t peek(FILE *f)
 // build a list of conses. this is complicated by the fact that all conses
 // can move whenever a new cons is allocated. we have to refer to every cons
 // through a handle to a relocatable pointer (i.e. a pointer on the stack).
-static void read_list(FILE *f, value_t *pval)
+// TODO static
+void read_list(FILE *f, value_t *pval)
 {
     value_t c, *pc;
     u_int32_t t;

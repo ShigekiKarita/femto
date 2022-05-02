@@ -35,17 +35,23 @@ enum Tag {
   cons = 0x3,
 }
 
-value_t tagptr(symbol_t* p, Tag t) {
+enum UNBOUND = Tag.sym;  // an invalid symbol pointer.
+
+Tag tag(value_t x) { return cast(Tag) (x & 0x3); }
+
+value_t tagptr(void* p, Tag t) {
   return (cast(value_t) p) | t;
 }
 
 T* ptr(T)(value_t x) {
-  return cast(T*) (x & ~(cast(value_t) 0x3));
+  return cast(T*) (x & ~Tag.cons);
 }
 
 value_t builtin(int n) {
   return tagptr(cast(symbol_t*) (n << 2), Tag.builtin);
 }
+
+bool iscons(value_t x) { return tag(x) == Tag.cons; }
 
 value_t set(value_t s, value_t v) {
   return ptr!symbol_t(s).binding = v;
@@ -54,7 +60,6 @@ value_t set(value_t s, value_t v) {
 value_t setc(value_t s, value_t v) {
   return ptr!symbol_t(s).constant = v;
 }
-
 
 enum {
     // special forms
@@ -75,14 +80,25 @@ static string[] builtin_names =
 extern (C) extern __gshared char* stack_bottom;
 
 enum PROCESS_STACK_SIZE = 2 * 1024 * 1024;
+enum N_STACK = 49_152;
+extern (C) extern __gshared value_t[N_STACK] Stack;
 
 extern (C) extern __gshared uint SP;
+
+ref value_t PUSH(value_t v) { return Stack[SP++] = v; }
+ref value_t POP() { return Stack[--SP]; }
+ref uint POPN(int n) { return SP -= n; }
 
 extern (C) extern __gshared value_t NIL, T, LAMBDA, MACRO, LABEL, QUOTE;
 
 // error utilities ------------------------------------------------------------
 
-extern (C) extern __gshared jmp_buf toplevel;
+jmp_buf toplevel;
+
+void lerror(Args ...)(const(char)* fmt, Args args) {
+  fprintf(stderr, fmt, args);
+  longjmp(toplevel, 1);
+}
 
 // safe cast operators --------------------------------------------------------
 
@@ -144,11 +160,170 @@ void lisp_init() {
 
 // conses ---------------------------------------------------------------------
 
+value_t mk_cons() {
+  if (curheap > lim) gc();
+  curheap += cons_t.sizeof;
+  return tagptr(cast(cons_t*)curheap, Tag.cons);
+}
+
+// functions ending in _ are unsafe, faster versions
+ref value_t car_(value_t v) { return ptr!cons_t(v).car; }
+ref value_t cdr_(value_t v) { return ptr!cons_t(v).cdr; }
+
+value_t cons_(value_t* pcar, value_t* pcdr) {
+    value_t c = mk_cons();
+    car_(c) = *pcar;
+    cdr_(c) = *pcdr;
+    return c;
+}
+
+value_t* cons(value_t* pcar, value_t* pcdr) {
+  value_t c = mk_cons();
+  car_(c) = *pcar; cdr_(c) = *pcdr;
+  PUSH(c);
+  return &Stack[SP-1];
+}
+
 // collector ------------------------------------------------------------------
+
+value_t relocate(value_t v) {
+  if (!iscons(v)) return v;
+  if (car_(v) == UNBOUND) return cdr_(v);
+  value_t nc = mk_cons();
+  value_t a = car_(v);
+  value_t d = cdr_(v);
+  car_(v) = UNBOUND;
+  cdr_(v) = nc;
+  car_(nc) = relocate(a);
+  cdr_(nc) = relocate(d);
+  return nc;
+}
+
+void trace_globals(symbol_t* root) {
+  while (root !is null) {
+    root.binding = relocate(root.binding);
+    trace_globals(root.left);
+    root = root.right;
+  }
+}
+
+void gc() {
+  static int grew = 0;
+
+  curheap = tospace;
+  lim = curheap + heapsize- cons_t.sizeof;
+
+  foreach (i; 0..SP) Stack[i] = relocate(Stack[i]);
+  trace_globals(symtab);
+  debug {
+    fprintf(stderr, "[VERBOSE] gc found %ld/%d live conses\n",
+            (curheap-tospace)/8, heapsize/8);
+  }
+
+  ubyte* temp = tospace;
+  tospace = fromspace;
+  fromspace = temp;
+
+  // if we're using > 80% of the space, resize tospace so we have
+  // more space to fill next time. if we grew tospace last time,
+  // grow the other half of the heap this time to catch up.
+  if (grew || ((lim-curheap) < cast(int)(heapsize/5))) {
+    temp = cast(ubyte*) realloc(tospace, grew ? heapsize : heapsize*2);
+    if (temp is null)
+      lerror("out of memory\n");
+    tospace = temp;
+    if (!grew)
+      heapsize*=2;
+    grew = !grew;
+  }
+  if (curheap > lim)  // all data was live
+    gc();
+}
 
 // read -----------------------------------------------------------------------
 
-extern (C) value_t read_sexpr(FILE* f);
+enum Token {
+  TOK_NONE, TOK_OPEN, TOK_CLOSE, TOK_DOT, TOK_QUOTE, TOK_SYM, TOK_NUM
+}
+
+extern (C) extern __gshared Token toktype;
+extern (C) extern __gshared value_t tokval;
+
+extern (C) Token peek(FILE *f);
+
+void take() { toktype = Token.TOK_NONE; }
+
+// build a list of conses. this is complicated by the fact that all conses
+// can move whenever a new cons is allocated. we have to refer to every cons
+// through a handle to a relocatable pointer (i.e. a pointer on the stack).
+extern (C) void read_list(FILE* f, value_t* pval);
+
+// FIXME
+void _read_list(FILE* f, value_t* pval) {
+  value_t c;
+  value_t *pc;
+  uint t;
+
+  PUSH(NIL);
+  pc = &Stack[SP-1];  // to keep track of current cons cell
+  t = peek(f);
+  while (t != Token.TOK_CLOSE) {
+    if (feof(f))
+      lerror("read: error: unexpected end of input\n");
+    c = mk_cons(); car_(c) = cdr_(c) = NIL;
+    if (iscons(*pc))
+      cdr_(*pc) = c;
+    else
+      *pval = c;
+    *pc = c;
+    c = read_sexpr(f);  // must be on separate lines due to undefined
+    car_(*pc) = c;      // evaluation order
+
+    t = peek(f);
+    if (t == Token.TOK_DOT) {
+      take();
+      c = read_sexpr(f);
+      cdr_(*pc) = c;
+      t = peek(f);
+      if (feof(f))
+        lerror("read: error: unexpected end of input\n");
+      if (t != Token.TOK_CLOSE)
+        lerror("read: error: expected ')'\n");
+    }
+  }
+  take();
+  POP();
+}
+
+value_t read_sexpr(FILE* f) {
+  final switch (peek(f)) with (Token) {
+    case TOK_NONE:
+      return NIL;
+    case TOK_CLOSE:
+      take();
+      lerror("read: error: unexpected ')'\n");
+      assert(false, "read: error: unexpected ')'\n");
+    case TOK_DOT:
+      take();
+      lerror("read: error: unexpected '.'\n");
+      assert(false, "read: error: unexpected '.'\n");
+    case TOK_SYM:
+    case TOK_NUM:
+      take();
+      return tokval;
+    case TOK_QUOTE:
+      take();
+      PUSH(read_sexpr(f));
+      value_t v = cons_(&QUOTE, cons(&Stack[SP-1], &NIL));
+      POPN(2);
+      return v;
+    case TOK_OPEN:
+      take();
+      PUSH(NIL);
+      read_list(f, &Stack[SP-1]);
+      return POP();
+  }
+}
 
 // print ----------------------------------------------------------------------
 
