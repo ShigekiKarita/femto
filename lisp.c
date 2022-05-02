@@ -104,7 +104,7 @@ u_int32_t SP = 0;
 value_t NIL, T, LAMBDA, MACRO, LABEL, QUOTE;
 
 value_t read_sexpr(FILE *f);
-void print(FILE *f, value_t v);
+static void print(FILE *f, value_t v);
 value_t eval_sexpr(value_t e, value_t *penv);
 value_t load_file(char *fname);
 
@@ -509,7 +509,7 @@ value_t read_sexpr(FILE *f)
 
 // print ----------------------------------------------------------------------
 
-void print(FILE *f, value_t v)
+static void print(FILE *f, value_t v)
 {
     value_t cd;
 

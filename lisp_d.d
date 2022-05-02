@@ -327,7 +327,40 @@ value_t read_sexpr(FILE* f) {
 
 // print ----------------------------------------------------------------------
 
-extern (C) void print(FILE* f, value_t v);
+number_t numval(value_t x) { return (cast(number_t) x) >> 2; }
+
+int intval(value_t x) { return (cast(int) x) >> 2; }
+
+void print(FILE* f, value_t v) {
+  final switch (tag(v)) {
+    case Tag.num:
+      fprintf(f, "%ld", numval(v));
+      return;
+    case Tag.sym:
+      fprintf(f, "%s", ptr!symbol_t(v).name.ptr);
+      return;
+    case Tag.builtin:
+      fprintf(f, "#<builtin %s>", builtin_names[intval(v)].ptr);
+      return;
+    case Tag.cons:
+      fprintf(f, "(");
+      while (1) {
+        print(f, car_(v));
+        value_t cd = cdr_(v);
+        if (!iscons(cd)) {
+          if (cd != NIL) {
+            fprintf(f, " . ");
+            print(f, cd);
+          }
+          fprintf(f, ")");
+          return;
+        }
+        fprintf(f, " ");
+        v = cd;
+      }
+      return;
+  }
+}
 
 // eval -----------------------------------------------------------------------
 
